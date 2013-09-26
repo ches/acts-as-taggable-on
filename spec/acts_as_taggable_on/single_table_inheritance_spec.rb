@@ -186,6 +186,7 @@ describe "Single Table Inheritance" do
 
   describe 'a subclass of Tag' do
     let(:company) { Company.new(:name => 'Dewey, Cheatham & Howe') }
+    let(:user) { User.create! }
 
     subject { Market.create! :name => 'finance' }
 
@@ -201,6 +202,12 @@ describe "Single Table Inheritance" do
       company.location_list = 'cambridge'
       company.save!
       ActsAsTaggableOn::Tag.where(name: 'cambridge', type: nil).should_not be_empty
+    end
+
+    it 'is returned with proper type through ownership' do
+      user.tag(company, :with => 'ripoffs, rackets', :on => :markets)
+      tags = company.owner_tags_on(user, :markets)
+      tags.all? { |tag| tag.is_a? Market }.should be_true
     end
   end
 end
