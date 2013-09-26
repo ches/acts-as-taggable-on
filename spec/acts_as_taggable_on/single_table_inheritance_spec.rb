@@ -184,4 +184,24 @@ describe "Single Table Inheritance" do
     end
   end
 
+  describe 'a subclass of Tag' do
+    let(:company) { Company.new(:name => 'Dewey, Cheatham & Howe') }
+
+    subject { Market.create! :name => 'finance' }
+
+    its(:type) { should eql 'Market' }
+
+    it 'sets STI type through string list' do
+      company.market_list = 'law, accounting'
+      company.save!
+      Market.all.should have(2).markets
+    end
+
+    it 'does not interfere with a normal Tag context on the same model' do
+      company.location_list = 'cambridge'
+      company.save!
+      ActsAsTaggableOn::Tag.where(name: 'cambridge', type: nil).should_not be_empty
+    end
+  end
 end
+

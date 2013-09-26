@@ -449,7 +449,9 @@ describe "Taggable" do
 
   describe "grouped_column_names_for method" do
     it "should return all column names joined for Tag GROUP clause" do
-      @taggable.grouped_column_names_for(ActsAsTaggableOn::Tag).should == "tags.id, tags.name"
+      # NOTE: type column supports an STI Tag subclass in the test suite, though
+      # isn't included by default in the migration generator
+      @taggable.grouped_column_names_for(ActsAsTaggableOn::Tag).should == "tags.id, tags.name, tags.type"
     end
 
     it "should return all column names joined for TaggableModel GROUP clause" do
