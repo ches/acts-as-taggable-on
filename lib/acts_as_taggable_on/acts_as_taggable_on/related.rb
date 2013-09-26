@@ -43,10 +43,13 @@ module ActsAsTaggableOn::Taggable
     module InstanceMethods
       def matching_contexts_for(search_context, result_context, klass, options = {})
         tags_to_find = tags_on(search_context).collect { |t| t.name }
+        tag_class = tag_class_for_context(search_context)
+        tags_table_name = tag_class.table_name
+        taggings_table_name = tagging_class_for_context(search_context).table_name
 
-        klass.select("#{klass.table_name}.*, COUNT(#{ActsAsTaggableOn::Tag.table_name}.#{ActsAsTaggableOn::Tag.primary_key}) AS count") \
-             .from("#{klass.table_name}, #{ActsAsTaggableOn::Tag.table_name}, #{ActsAsTaggableOn::Tagging.table_name}") \
-             .where(["#{exclude_self(klass, id)} #{klass.table_name}.#{klass.primary_key} = #{ActsAsTaggableOn::Tagging.table_name}.taggable_id AND #{ActsAsTaggableOn::Tagging.table_name}.taggable_type = '#{klass.base_class.to_s}' AND #{ActsAsTaggableOn::Tagging.table_name}.tag_id = #{ActsAsTaggableOn::Tag.table_name}.#{ActsAsTaggableOn::Tag.primary_key} AND #{ActsAsTaggableOn::Tag.table_name}.name IN (?) AND #{ActsAsTaggableOn::Tagging.table_name}.context = ?", tags_to_find, result_context]) \
+        klass.select("#{klass.table_name}.*, COUNT(#{tags_table_name}.#{tag_class.primary_key}) AS count") \
+             .from("#{klass.table_name}, #{tags_table_name}, #{taggings_table_name}") \
+             .where(["#{exclude_self(klass, id)} #{klass.table_name}.#{klass.primary_key} = #{taggings_table_name}.taggable_id AND #{taggings_table_name}.taggable_type = '#{klass.base_class.to_s}' AND #{taggings_table_name}.tag_id = #{tags_table_name}.#{tag_class.primary_key} AND #{tags_table_name}.name IN (?) AND #{taggings_table_name}.context = ?", tags_to_find, result_context]) \
              .group(group_columns(klass)) \
              .order("count DESC")
       end
@@ -54,10 +57,13 @@ module ActsAsTaggableOn::Taggable
       def related_tags_for(context, klass, options = {})
 				tags_to_ignore = Array.wrap(options.delete(:ignore)).map(&:to_s) || []
         tags_to_find = tags_on(context).collect { |t| t.name }.reject { |t| tags_to_ignore.include? t }
+        tag_class = tag_class_for_context(context)
+        tags_table_name = tag_class.table_name
+        taggings_table_name = tagging_class_for_context(context).table_name
 
-        klass.select("#{klass.table_name}.*, COUNT(#{ActsAsTaggableOn::Tag.table_name}.#{ActsAsTaggableOn::Tag.primary_key}) AS count") \
-             .from("#{klass.table_name}, #{ActsAsTaggableOn::Tag.table_name}, #{ActsAsTaggableOn::Tagging.table_name}") \
-             .where(["#{exclude_self(klass, id)} #{klass.table_name}.#{klass.primary_key} = #{ActsAsTaggableOn::Tagging.table_name}.taggable_id AND #{ActsAsTaggableOn::Tagging.table_name}.taggable_type = '#{klass.base_class.to_s}' AND #{ActsAsTaggableOn::Tagging.table_name}.tag_id = #{ActsAsTaggableOn::Tag.table_name}.#{ActsAsTaggableOn::Tag.primary_key} AND #{ActsAsTaggableOn::Tag.table_name}.name IN (?)", tags_to_find]) \
+        klass.select("#{klass.table_name}.*, COUNT(#{tags_table_name}.#{tag_class.primary_key}) AS count") \
+             .from("#{klass.table_name}, #{tags_table_name}, #{taggings_table_name}") \
+             .where(["#{exclude_self(klass, id)} #{klass.table_name}.#{klass.primary_key} = #{taggings_table_name}.taggable_id AND #{taggings_table_name}.taggable_type = '#{klass.base_class.to_s}' AND #{taggings_table_name}.tag_id = #{tags_table_name}.#{tag_class.primary_key} AND #{tags_table_name}.name IN (?)", tags_to_find]) \
              .group(group_columns(klass)) \
              .order("count DESC")
       end

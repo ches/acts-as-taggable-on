@@ -30,18 +30,20 @@ module ActsAsTaggableOn::Taggable
     
     module InstanceMethods
       def owner_tags_on(owner, context)
+        tagging_table_name = tagging_class_for_context(context).table_name
+
         if owner.nil?
-          scope = base_tags.where([%(#{ActsAsTaggableOn::Tagging.table_name}.context = ?), context.to_s])                    
+          scope = base_tags.where([%(#{tagging_table_name}.context = ?), context.to_s])
         else
-          scope = base_tags.where([%(#{ActsAsTaggableOn::Tagging.table_name}.context = ? AND
-                                     #{ActsAsTaggableOn::Tagging.table_name}.tagger_id = ? AND
-                                     #{ActsAsTaggableOn::Tagging.table_name}.tagger_type = ?), context.to_s, owner.id, owner.class.base_class.to_s])          
+          scope = base_tags.where([%(#{tagging_table_name}.context = ? AND
+                                     #{tagging_table_name}.tagger_id = ? AND
+                                     #{tagging_table_name}.tagger_type = ?), context.to_s, owner.id, owner.class.base_class.to_s])
         end
 
         # when preserving tag order, return tags in created order
         # if we added the order to the association this would always apply
         if self.class.preserve_tag_order?
-          scope.order("#{ActsAsTaggableOn::Tagging.table_name}.id")
+          scope.order("#{tagging_table_name}.id")
         else 
           scope
         end
@@ -79,9 +81,11 @@ module ActsAsTaggableOn::Taggable
       def save_owned_tags
         tagging_contexts.each do |context|
           cached_owned_tag_list_on(context).each do |owner, tag_list|
+            tagging_class = tagging_class_for_context(context)
             
             # Find existing tags or create non-existing tags:
-            tags = find_or_create_tags_from_list_with_context(tag_list.uniq, context)
+            tag_class = tag_class_for_context(context)
+            tags = tag_class.find_or_create_all_with_like_by_name(tag_list.uniq)
 
             # Tag objects for owned tags
             owned_tags = owner_tags_on(owner, context)
@@ -111,14 +115,14 @@ module ActsAsTaggableOn::Taggable
             # Find all taggings that belong to the taggable (self), are owned by the owner, 
             # have the correct context, and are removed from the list.
             if old_tags.present?
-              old_taggings = ActsAsTaggableOn::Tagging.where(:taggable_id => id, :taggable_type => self.class.base_class.to_s,
-                                                             :tagger_type => owner.class.base_class.to_s, :tagger_id => owner.id,
-                                                             :tag_id => old_tags, :context => context)
+              old_taggings = tagging_class.where(:taggable_id => id, :taggable_type => self.class.base_class.to_s,
+                                                 :tagger_type => owner.class.base_class.to_s, :tagger_id => owner.id,
+                                                 :tag_id => old_tags, :context => context)
             end
           
             # Destroy old taggings:
             if old_taggings.present?
-              ActsAsTaggableOn::Tagging.destroy_all(:id => old_taggings.map(&:id))
+              tagging_class.destroy_all(:id => old_taggings.map(&:id))
             end
 
             # Create new taggings:
