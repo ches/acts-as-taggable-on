@@ -31,13 +31,14 @@ module ActsAsTaggableOn::Taggable
     module InstanceMethods
       def owner_tags_on(owner, context)
         tagging_table_name = tagging_class_for_context(context).table_name
+        base_scope = base_tags_for_context(context)
 
         if owner.nil?
-          scope = base_tags.where([%(#{tagging_table_name}.context = ?), context.to_s])
+          scope = base_scope.where([%(#{tagging_table_name}.context = ?), context.to_s])
         else
-          scope = base_tags.where([%(#{tagging_table_name}.context = ? AND
-                                     #{tagging_table_name}.tagger_id = ? AND
-                                     #{tagging_table_name}.tagger_type = ?), context.to_s, owner.id, owner.class.base_class.to_s])
+          scope = base_scope.where([%(#{tagging_table_name}.context = ? AND
+                                      #{tagging_table_name}.tagger_id = ? AND
+                                      #{tagging_table_name}.tagger_type = ?), context.to_s, owner.id, owner.class.base_class.to_s])
         end
 
         # when preserving tag order, return tags in created order

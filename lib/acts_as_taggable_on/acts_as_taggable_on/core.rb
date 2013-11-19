@@ -303,9 +303,10 @@ module ActsAsTaggableOn::Taggable
       def all_tags_on(context)
         tag_class = tag_class_for_context(context)
         tagging_table_name = tagging_class_for_context(context).table_name
+        base_scope = base_tags_for_context(context)
 
         opts  =  ["#{tagging_table_name}.context = ?", context.to_s]
-        scope = base_tags.where(opts)
+        scope = base_scope.where(opts)
 
         if tag_class.using_postgresql?
           group_columns = grouped_column_names_for(tag_class)
@@ -319,7 +320,8 @@ module ActsAsTaggableOn::Taggable
       # Returns all tags that are not owned of a given context
       def tags_on(context)
         tagging_table_name = tagging_class_for_context(context).table_name
-        scope = base_tags.where(["#{tagging_table_name}.context = ? AND #{tagging_table_name}.tagger_id IS NULL", context.to_s])
+        base_scope = base_tags_for_context(context)
+        scope = base_scope.where(["#{tagging_table_name}.context = ? AND #{tagging_table_name}.tagger_id IS NULL", context.to_s])
         # when preserving tag order, return tags in created order
         # if we added the order to the association this would always apply
         scope = scope.order("#{tagging_table_name}.id") if self.class.preserve_tag_order?
@@ -401,7 +403,7 @@ module ActsAsTaggableOn::Taggable
 
           # Find taggings to remove:
           if old_tags.present?
-            old_taggings = taggings.where(:tagger_type => nil, :tagger_id => nil, :context => context.to_s, :tag_id => old_tags)
+            old_taggings = taggings_for_context(context).where(:tagger_type => nil, :tagger_id => nil, :context => context.to_s, :tag_id => old_tags)
           end
 
           # Destroy old taggings:
@@ -412,7 +414,7 @@ module ActsAsTaggableOn::Taggable
 
           # Create new taggings:
           new_tags.each do |tag|
-            taggings.create!(:tag_id => tag.id, :context => context.to_s, :taggable => self)
+            taggings_for_context(context).create!(:tag_id => tag.id, :context => context.to_s, :taggable => self)
           end
         end
 
@@ -420,6 +422,48 @@ module ActsAsTaggableOn::Taggable
       end
 
       private
+
+      ##
+      # Hook allowing the base Tag scope to be overridden, if you are using an
+      # {ActsAsTaggableOn::Tag} subclass with its own table.
+      #
+      # @example Richly-featured Tag subclass
+      #   class MarketTag < ActsAsTaggableOn::Tag
+      #     self.table_name = 'market_tags'
+      #   end
+      #
+      #   class Company < ActiveRecord::Base
+      #     acts_as_taggable              # Standard tagging behavior
+      #     acts_as_taggable_on :markets  # Plus a context with Tag subclass
+      #
+      #     has_many :market_taggings, :as => :taggable,
+      #                                :dependent  => :destroy,
+      #                                :class_name => 'MarketTagging'
+      #
+      #     has_many :base_market_tags, :through => :market_taggings,
+      #                                 :source  => :tag,
+      #                                 :class_name => 'MarketTag'
+      #
+      #     # @company.market_list etc. will do the right thing
+      #     def base_tags_for_context(context)
+      #       context.to_sym == :markets ? base_market_tags : super
+      #     end
+      #
+      #     def taggings_for_context(context)
+      #       context.to_sym == :markets ? market_taggings : super
+      #     end
+      #   end
+      #
+      # @param [Symbol, String] context
+      #   Tag context for which to specify a base scope
+      def base_tags_for_context(context)
+        base_tags
+      end
+
+      # @see base_tags_for_context
+      def taggings_for_context(context)
+        taggings
+      end
 
       def tag_class_for_context(context)
         self.class.tag_class_for_context(context)
